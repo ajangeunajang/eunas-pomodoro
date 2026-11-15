@@ -226,15 +226,24 @@
   .tasks form .bullet { display: none; }
 
   /* settings */
-  .settings-toggle { font-size: 12px; color: var(--muted); border-bottom: 1px dotted currentColor; padding-bottom: 1px; }
-  .settings-toggle:hover { color: var(--fg); }
+  .settings-wrap { position: absolute; top: 16px; right: clamp(16px, 4vw, 40px); z-index: 20; }
+  .settings-toggle {
+    display: grid; place-items: center; width: 36px; height: 36px; margin-left: auto;
+    color: var(--muted); transition: color .2s;
+  }
+  .settings-toggle svg { width: 22px; height: 22px; transition: transform .4s cubic-bezier(.34, 1.56, .64, 1); }
+  .settings-toggle:hover, .settings-toggle[aria-expanded="true"] { color: var(--fg); }
+  .settings-toggle:hover svg, .settings-toggle[aria-expanded="true"] svg { transform: rotate(60deg); }
   .settings {
-    width: min(100%, 320px);
+    position: absolute; top: 44px; right: 0;
+    width: min(320px, calc(100vw - 32px));
     display: grid;
     gap: 14px;
     font-size: 13px;
-    padding: 20px 0 0;
-    border-top: 1px solid var(--line);
+    padding: 20px;
+    background: var(--panel);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .08);
   }
   .settings[hidden] { display: none; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -251,7 +260,7 @@
   .stepper button:hover { color: var(--fg); border-color: var(--fg); }
   .stepper button:disabled { opacity: .3; pointer-events: none; }
   .stepper output { min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
-  .settings .actions { display: flex; justify-content: space-between; padding-top: 4px; font-size: 12px; }
+  .settings .actions { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; font-size: 12px; }
   .settings .actions button { color: var(--muted); }
   .settings .actions button:hover { color: var(--fg); }
 
@@ -272,6 +281,35 @@
 </head>
 <body data-mode="focus" data-view="pick">
 <main>
+  <div class="settings-wrap" id="settingsWrap">
+    <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings" aria-label="settings" title="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M10.3 2.8h3.4l.5 2.4 1.6.9 2.3-.8 1.7 2.9-1.8 1.6v1.9l1.8 1.6-1.7 2.9-2.3-.8-1.6.9-.5 2.4h-3.4l-.5-2.4-1.6-.9-2.3.8-1.7-2.9 1.8-1.6v-1.9L4.2 8.2l1.7-2.9 2.3.8 1.6-.9z"/><circle cx="12" cy="12" r="3"/></g></svg>
+    </button>
+
+    <section class="settings" id="settings" hidden aria-label="settings">
+      <div class="row" data-key="focus" data-min="1" data-max="60" data-unit="min">
+        <span class="label">focus</span>
+        <div class="stepper"><button data-d="-1" aria-label="decrease focus">−</button><output></output><button data-d="1" aria-label="increase focus">+</button></div>
+      </div>
+      <div class="row" data-key="short" data-min="1" data-max="30" data-unit="min">
+        <span class="label">short break</span>
+        <div class="stepper"><button data-d="-1" aria-label="decrease short break">−</button><output></output><button data-d="1" aria-label="increase short break">+</button></div>
+      </div>
+      <div class="row" data-key="long" data-min="1" data-max="60" data-unit="min">
+        <span class="label">long break</span>
+        <div class="stepper"><button data-d="-1" aria-label="decrease long break">−</button><output></output><button data-d="1" aria-label="increase long break">+</button></div>
+      </div>
+      <div class="row" data-key="cycle" data-min="2" data-max="8" data-unit="sessions">
+        <span class="label">cycle</span>
+        <div class="stepper"><button data-d="-1" aria-label="decrease sessions per cycle">−</button><output></output><button data-d="1" aria-label="increase sessions per cycle">+</button></div>
+      </div>
+      <div class="actions">
+        <button id="defaults">restore defaults</button>
+        <button id="clearTomatoes">clear tomatoes</button>
+      </div>
+    </section>
+  </div>
+
   <section class="picker" id="picker" aria-label="choose a clock">
     <h1><span aria-hidden="true">*</span>choose a timer</h1>
     <div class="choices">
@@ -308,32 +346,6 @@
   </div>
 
   <p class="hint">space start/pause · r reset · s skip</p>
-
-  <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings">settings</button>
-
-  <section class="settings" id="settings" hidden aria-label="settings">
-    <div class="row" data-key="focus" data-min="1" data-max="60" data-unit="min">
-      <span class="label">focus</span>
-      <div class="stepper"><button data-d="-1" aria-label="decrease focus">−</button><output></output><button data-d="1" aria-label="increase focus">+</button></div>
-    </div>
-    <div class="row" data-key="short" data-min="1" data-max="30" data-unit="min">
-      <span class="label">short break</span>
-      <div class="stepper"><button data-d="-1" aria-label="decrease short break">−</button><output></output><button data-d="1" aria-label="increase short break">+</button></div>
-    </div>
-    <div class="row" data-key="long" data-min="1" data-max="60" data-unit="min">
-      <span class="label">long break</span>
-      <div class="stepper"><button data-d="-1" aria-label="decrease long break">−</button><output></output><button data-d="1" aria-label="increase long break">+</button></div>
-    </div>
-    <div class="row" data-key="cycle" data-min="2" data-max="8" data-unit="sessions">
-      <span class="label">cycle</span>
-      <div class="stepper"><button data-d="-1" aria-label="decrease sessions per cycle">−</button><output></output><button data-d="1" aria-label="increase sessions per cycle">+</button></div>
-    </div>
-    <div class="actions">
-      <button id="defaults">restore defaults</button>
-      <button id="clearTomatoes">clear tomatoes</button>
-      <button id="settingsClose">done</button>
-    </div>
-  </section>
   </div>
 </main>
 
@@ -579,6 +591,7 @@
     if (idle) remaining = DURATION[mode] * 1000;
     else if (!endAt) remaining = Math.min(remaining, DURATION[mode] * 1000);
     renderSettings(); renderDots(); setStatus(); render();
+    if (document.body.dataset.view === "pick") renderPreviews();
   }
 
   rows.forEach((row) => {
@@ -593,10 +606,13 @@
   function openPanel(open) {
     panel.hidden = !open;
     panelToggle.setAttribute("aria-expanded", String(open));
-    panelToggle.textContent = open ? "close settings" : "settings";
   }
   panelToggle.addEventListener("click", () => openPanel(panel.hidden));
-  $("settingsClose").addEventListener("click", () => openPanel(false));
+  // close when clicking anywhere else or pressing Escape
+  document.addEventListener("pointerdown", (e) => {
+    if (!panel.hidden && !$("settingsWrap").contains(e.target)) openPanel(false);
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) openPanel(false); });
   $("defaults").addEventListener("click", () => { Object.assign(settings, DEFAULTS); applySettings(); });
 
   // tasks — the first unfinished one is what this session is for
