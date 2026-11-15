@@ -175,9 +175,9 @@
   /* fixed-height block so checking off / adding tasks never moves the clock;
      the list starts at the top of it and scrolls once it fills up */
   .tasks {
-    width: min(100%, 520px); height: 210px;
+    width: min(100%, 520px); height: 150px;
     display: flex; flex-direction: column; justify-content: flex-start;
-    font-size: 17px; text-align: center; margin: 0 0 -8px;
+    font-size: 15px; text-align: center; margin: 0 0 -8px;
   }
   .tasks ul {
     list-style: none; display: grid; justify-items: center; gap: 8px; margin-bottom: 10px;
@@ -193,8 +193,8 @@
   }
   /* the current task is the headline above the dial */
   .tasks li.current { order: -1; margin-bottom: 10px; }
-  .tasks li.current .text { color: var(--accent); font-size: clamp(28px, 8vw, 40px); font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; }
-  .tasks li.current .bullet { color: var(--accent); font-size: clamp(28px, 8vw, 40px); }
+  .tasks li.current .text { color: var(--accent); font-size: clamp(20px, 5.5vw, 26px); font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; }
+  .tasks li.current .bullet { color: var(--accent); font-size: clamp(20px, 5.5vw, 26px); }
   /* on a break the task waits — dim it */
   body:not([data-mode="focus"]) .tasks li.current .text,
   body:not([data-mode="focus"]) .tasks li.current .bullet { color: var(--muted); }
