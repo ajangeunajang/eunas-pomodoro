@@ -318,6 +318,7 @@
     </div>
     <div class="actions">
       <button id="defaults">restore defaults</button>
+      <button id="clearTomatoes">clear tomatoes</button>
       <button id="settingsClose">done</button>
     </div>
   </section>
@@ -860,6 +861,20 @@
     simulate(t);
   }
 
+  // settings → "clear tomatoes": every tomato shrinks away and the saved pile is emptied
+  function clearTomatoes() {
+    pile.length = 0;
+    savePile();
+    [...document.querySelectorAll(".tomato")].forEach((el, i) => {
+      el.dataset.gone = "1";
+      el.style.pointerEvents = "none";
+      el.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.4 }],
+        { duration: 280, delay: Math.min(i * 20, 400), easing: "ease-in", fill: "forwards" })
+        .finished.then(() => el.remove(), () => el.remove());
+    });
+  }
+  $("clearTomatoes").addEventListener("click", clearTomatoes);
+
   // clicking a tomato sends it flying again; anything resting on it drops too
   function kick(t) {
     if (reduceMotion()) return;
@@ -890,6 +905,7 @@
     let last = performance.now(), still = 0;
 
     const step = (now) => {
+      if (!t.el.isConnected || t.el.dataset.gone) return; // cleared mid-flight
       // rAF timestamps can precede performance.now() on the first frame
       const dt = Math.max(0, Math.min(0.032, (now - last) / 1000));
       last = now;
