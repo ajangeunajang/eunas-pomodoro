@@ -615,8 +615,10 @@
     const m = btn.dataset.mode;
     const draw = mountDial(btn.querySelector(".face"));
     btn.addEventListener("click", () => {
+      const from = btn.querySelector(".face").getBoundingClientRect();
       if (m !== mode || !endAt) setMode(m);
       showView("timer");
+      if (canAnimate()) slideIn(from);
     });
     return () => {
       draw(DURATION[m] * 1000);
@@ -624,6 +626,34 @@
     };
   });
   const renderPreviews = () => previews.forEach((p) => p());
+
+  // desktop: the chosen dial glides from its card to the timer's spot (FLIP),
+  // and the rest of the timer fades in around it
+  const canAnimate = () =>
+    matchMedia("(min-width: 641px)").matches &&
+    !matchMedia("(prefers-reduced-motion: reduce)").matches &&
+    typeof Element.prototype.animate === "function";
+
+  function slideIn(from) {
+    const dial = $("dial");
+    const to = dial.getBoundingClientRect();
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const s = from.width / to.width;
+    const ease = "cubic-bezier(.22, .9, .25, 1)";
+    dial.style.zIndex = 1;
+    dial.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }],
+      { duration: 650, easing: ease }
+    ).finished.then(() => { dial.style.zIndex = ""; }, () => {});
+    [...timerView.children].forEach((el, i) => {
+      if (el === dial) return;
+      el.animate(
+        [{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }],
+        { duration: 400, delay: 320 + i * 30, easing: ease, fill: "backwards" }
+      );
+    });
+  }
 
   function showView(v) {
     document.body.dataset.view = v;
