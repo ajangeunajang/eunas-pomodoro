@@ -745,6 +745,32 @@
     p.el.style.transform = `translate(${p.cx - p.r}px, ${p.cy - p.r}px) rotate(${p.rot}deg)`;
   };
 
+  // the pile survives reloads: positions are kept relative to the bottom edge
+  const PILE_KEY = "pomodoro-tomatoes";
+  function savePile() {
+    const h = window.innerHeight;
+    try {
+      localStorage.setItem(PILE_KEY, JSON.stringify(
+        pile.map((p) => ({ x: Math.round(p.cx), b: Math.round(h - p.cy), rot: Math.round(p.rot) }))));
+    } catch (e) {}
+  }
+  function restorePile() {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem(PILE_KEY) || "[]"); } catch (e) {}
+    if (!Array.isArray(saved)) return;
+    const r = 22, h = window.innerHeight, w = window.innerWidth;
+    saved.slice(-MAX_PILE).forEach((s) => {
+      if (!Number.isFinite(s.x) || !Number.isFinite(s.b)) return;
+      const el = document.createElement("div");
+      el.className = "tomato";
+      el.innerHTML = TOMATO_SVG;
+      document.body.appendChild(el);
+      const p = { el, r, cx: Math.min(Math.max(s.x, r), w - r), cy: h - Math.max(s.b, r), rot: s.rot || 0 };
+      place(p);
+      pile.push(p);
+    });
+  }
+
   function dropTomato(x, y) {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const size = 44, r = size / 2;
@@ -807,6 +833,7 @@
           old.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: "forwards" })
             .finished.then(() => old.el.remove(), () => old.el.remove());
         }
+        savePile();
         return;
       }
       requestAnimationFrame(step);
@@ -814,6 +841,7 @@
     requestAnimationFrame(step);
   }
 
+  restorePile();
   renderTasks();
   renderSettings(); renderDots(); setStatus(); render();
   showView("pick");
