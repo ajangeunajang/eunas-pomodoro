@@ -170,11 +170,11 @@
 
   /* tasks */
   /* fixed-height block so checking off / adding tasks never moves the clock;
-     the list sits at the bottom of it and scrolls once it fills up */
+     the list starts at the top of it and scrolls once it fills up */
   .tasks {
     width: min(100%, 520px); height: 210px;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    font-size: 17px; text-align: center; margin-bottom: -8px;
+    display: flex; flex-direction: column; justify-content: flex-start;
+    font-size: 17px; text-align: center; margin: 0 0 -8px;
   }
   .tasks ul {
     list-style: none; display: grid; justify-items: center; gap: 8px; margin-bottom: 10px;
@@ -380,7 +380,9 @@
   };
   const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
-  // kitchen-timer wedge on a 60-min face, so 25 / 5 / 15 min read at a glance
+  // a wedge on a round face; draw(frac) fills that fraction of the circle.
+  // The picker scales to an hour (25 / 5 / 15 min read at a glance);
+  // the timer scales to the session, so it starts as a full circle.
   function mountDial(face) {
       face.innerHTML = "";
       const svg = svgEl("svg", { viewBox: "-110 -110 220 220", "aria-hidden": "true" });
@@ -397,10 +399,11 @@
       const wedge = svgEl("path", { class: "wedge" });
       svg.append(ticks, wedge, svgEl("circle", { class: "hub", r: 7 }));
       face.appendChild(svg);
-      return (ms) => wedge.setAttribute("d", wedgePath(clamp01(ms / 3600000)));
+      return (frac) => wedge.setAttribute("d", wedgePath(clamp01(frac)));
   }
 
   const drawMain = mountDial($("dial"));
+  let wedgeTweening = false; // true while a slide is morphing the wedge
 
   // wedge = remaining time, shrinking back toward 12 o'clock (counter-clockwise face)
   function wedgePath(frac) {
@@ -432,7 +435,7 @@
 
   function render() {
     const ms = current();
-    drawMain(ms, DURATION[mode] * 1000);
+    if (!wedgeTweening) drawMain(ms / (DURATION[mode] * 1000));
     const t = fmt(ms);
     timeEl.textContent = t;
     document.title = endAt ? `${t} · ${LABEL[mode]}` : "Pomodoro";
@@ -647,24 +650,43 @@
 
   // ---- picker: the first screen shows focus / short / long as three dials
   const pickerEl = $("picker"), timerView = $("timerView");
+  const cardDraws = {};
   const previews = [...pickerEl.querySelectorAll(".choice")].map((btn) => {
     const m = btn.dataset.mode;
     const draw = mountDial(btn.querySelector(".face"));
+    cardDraws[m] = draw;
     btn.addEventListener("click", () => {
       // measure the card untilted: the hover rotation inflates its bounding box
       const face = btn.querySelector(".face"), r = face.getBoundingClientRect();
       const w = face.offsetWidth;
-      const from = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w, angle: btn.matches(":hover") ? 3 : 0 };
+      const from = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w, angle: btn.matches(":hover") ? 3 : 0, frac: hourFrac(m) };
       if (m !== mode || !endAt) setMode(m);
       showView("timer");
       if (canAnimate()) slideIn(from);
     });
     return () => {
-      draw(DURATION[m] * 1000);
+      draw(hourFrac(m));
       btn.querySelector("small").textContent = `${settings[m]} min`;
     };
   });
   const renderPreviews = () => previews.forEach((p) => p());
+  const hourFrac = (m) => (DURATION[m] * 1000) / 3600000;
+  const sessionFrac = () => {
+    const left = endAt ? Math.max(0, endAt - Date.now()) : remaining;
+    return left / (DURATION[mode] * 1000);
+  };
+
+  // during a slide the wedge also morphs between the two scales
+  function tweenWedge(draw, from, toFn, duration, done) {
+    const t0 = performance.now();
+    const ease = (x) => 1 - Math.pow(1 - x, 4);
+    const frame = (now) => {
+      const k = Math.min(1, (now - t0) / duration);
+      draw(from + (toFn() - from) * ease(k));
+      if (k < 1) requestAnimationFrame(frame); else done && done();
+    };
+    requestAnimationFrame(frame);
+  }
 
   // desktop: the chosen dial glides from its card to the timer's spot (FLIP),
   // and the rest of the timer fades in around it
@@ -686,6 +708,9 @@
       [{ transform: `translate(${dx}px, ${dy}px) scale(${s}) rotate(${from.angle}deg)` }, { transform: "none" }],
       { duration: 650, easing: ease }
     ).finished.then(() => { dial.style.zIndex = ""; }, () => {});
+    wedgeTweening = true;
+    drawMain(from.frac);
+    tweenWedge(drawMain, from.frac, sessionFrac, 650, () => { wedgeTweening = false; render(); });
     [...timerView.children].forEach((el, i) => {
       if (el === dial) return;
       el.animate(
@@ -705,7 +730,7 @@
   // the reverse: the timer dial glides back into its card, the other cards fade in
   $("backToPicker").addEventListener("click", () => {
     const dial = $("dial"), r = dial.getBoundingClientRect();
-    const from = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: dial.offsetWidth };
+    const from = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: dial.offsetWidth, frac: sessionFrac() };
     showView("pick");
     if (canAnimate()) slideBack(from);
   });
@@ -724,6 +749,7 @@
       [{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }],
       { duration: 650, easing: ease }
     ).finished.then(() => { card.style.zIndex = ""; card.style.position = ""; }, () => {});
+    tweenWedge(cardDraws[mode], from.frac, () => hourFrac(mode), 650);
     const others = [pickerEl.querySelector("h1"), ...card.querySelectorAll("span, small"),
       ...[...pickerEl.querySelectorAll(".choice")].filter((c) => c !== card)];
     others.forEach((el, i) => {
