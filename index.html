@@ -92,6 +92,17 @@
   }
   .face svg { position: absolute; inset: var(--pad); width: calc(100% - 2 * var(--pad)); height: calc(100% - 2 * var(--pad)); overflow: visible; }
   .dial { width: min(80vw, 420px); cursor: pointer; }
+  /* alarm-clock buzz — uses the standalone translate/rotate properties so it
+     stacks on top of the hover tilt (transform) instead of fighting it */
+  @keyframes buzz {
+    0%, 100% { translate: 0; rotate: 0deg; }
+    25% { translate: -3px 0; rotate: -2deg; }
+    50% { translate: 3px 0; rotate: 2deg; }
+    75% { translate: -2px 0; rotate: -1deg; }
+  }
+  .dial.buzz-short { animation: buzz .1s linear 3; }
+  .dial.buzz-ring { animation: buzz .1s linear 10; }
+  @media (prefers-reduced-motion: reduce) { .dial.buzz-short, .dial.buzz-ring { animation: none; } }
   .ticks line { stroke: color-mix(in srgb, var(--muted) 45%, var(--panel)); stroke-width: 1; }
   .ticks line.major { stroke: var(--muted); }
   .wedge { fill: var(--c); transition: fill .4s; }
@@ -447,7 +458,15 @@
     endAt = null;
     setStatus(); render();
   }
-  const toggle = () => (endAt ? pause() : start());
+  // user-initiated start gets a short buzz; pause stays still
+  const toggle = () => { if (endAt) pause(); else { start(); buzz("buzz-short"); } };
+  function buzz(kind) {
+    const d = $("dial");
+    d.classList.remove("buzz-short", "buzz-ring");
+    void d.offsetWidth; // restart the animation if it is already running
+    d.classList.add(kind);
+  }
+  $("dial").addEventListener("animationend", (e) => e.currentTarget.classList.remove("buzz-short", "buzz-ring"));
 
   function reset() { setMode(mode); }
 
@@ -466,6 +485,7 @@
 
   function finish() {
     chime();
+    buzz("buzz-ring");
     if (Notification?.permission === "granted" && document.hidden) {
       new Notification(mode === "focus" ? "Focus done — take a break" : "Break over — back to focus");
     }
