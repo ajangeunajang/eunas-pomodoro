@@ -363,7 +363,7 @@
     <pattern id="mesh" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <path d="M0 0V10M0 0H10" class="bag-mesh"/>
     </pattern>
-    <clipPath id="bagShape"><path d="M2 3 L22 88 Q24.5 98 35 98 L125 98 Q135.5 98 138 88 L158 3 Z"/></clipPath>
+    <clipPath id="bagShape"><path d="M2 3 L38 86 Q42 98 53 98 L107 98 Q118 98 122 86 L158 3 Z"/></clipPath>
   </defs>
   <rect width="160" height="100" fill="url(#mesh)" clip-path="url(#bagShape)"/>
 </svg>
@@ -917,10 +917,10 @@
     const X = (u) => r.left + (u / 160) * r.width, Y = (v) => r.top + (v / 100) * r.height;
     bag = {
       top: Y(3), floor: Y(98),
-      // the sides lean in toward the bottom (viewBox 2,3 → 23,93 and mirrored)
+      // the sides lean in toward the bottom (viewBox 2,3 → 41,94 and mirrored)
       walls: [
-        { ax: X(2), ay: Y(3), bx: X(23), by: Y(93) },
-        { ax: X(158), ay: Y(3), bx: X(137), by: Y(93) },
+        { ax: X(2), ay: Y(3), bx: X(41), by: Y(94) },
+        { ax: X(158), ay: Y(3), bx: X(119), by: Y(94) },
       ],
     };
   }
