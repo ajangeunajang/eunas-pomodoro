@@ -363,7 +363,7 @@
     <pattern id="mesh" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <path d="M0 0V10M0 0H10" class="bag-mesh"/>
     </pattern>
-    <clipPath id="bagShape"><path d="M2 3 L4 86 Q4 98 16 98 L144 98 Q156 98 156 86 L158 3 Z"/></clipPath>
+    <clipPath id="bagShape"><path d="M2 3 L22 88 Q24.5 98 35 98 L125 98 Q135.5 98 138 88 L158 3 Z"/></clipPath>
   </defs>
   <rect width="160" height="100" fill="url(#mesh)" clip-path="url(#bagShape)"/>
 </svg>
@@ -903,7 +903,7 @@
       // collision radius ≈ the body (a flat one sits lower, so it gets a smaller circle)
       r: shape.size * (shape.kind === "flat" ? 0.29 : 0.39) * Math.max(shape.sx, shape.sy),
     };
-    el.addEventListener("pointerdown", (e) => { e.preventDefault(); kick(t); });
+    el.addEventListener("pointerdown", (e) => { e.preventDefault(); kick(t, e.clientX); });
     place(t);
     return t;
   }
@@ -914,20 +914,17 @@
   let bag = null;
   function measureBag() {
     const r = bagEl.getBoundingClientRect();
-    const inset = r.width * 0.02;
-    bag = { wl: r.left + inset, wr: r.right - inset, top: r.top + r.height * 0.03, floor: r.bottom - r.height * 0.02 };
+    const X = (u) => r.left + (u / 160) * r.width, Y = (v) => r.top + (v / 100) * r.height;
+    bag = {
+      top: Y(3), floor: Y(98),
+      // the sides lean in toward the bottom (viewBox 2,3 → 23,93 and mirrored)
+      walls: [
+        { ax: X(2), ay: Y(3), bx: X(23), by: Y(93) },
+        { ax: X(158), ay: Y(3), bx: X(137), by: Y(93) },
+      ],
+    };
   }
   measureBag();
-
-  // pick a launch that drops the fruit through the bag's opening
-  function aimAtBag(t) {
-    const lo = bag.wl + t.r + 4, hi = bag.wr - t.r - 4;
-    const tx = lo < hi ? rand(lo, hi) : (bag.wl + bag.wr) / 2;
-    const target = bag.top - t.r;
-    const disc = t.vy * t.vy + 2 * GRAVITY * (target - t.cy);
-    const time = disc > 0 ? (-t.vy + Math.sqrt(disc)) / GRAVITY : 0.7;
-    t.vx = (tx - t.cx) / Math.max(time, 0.25);
-  }
 
   // the bag is anchored bottom-right, so the pile keeps its distance from that corner
   let lastH = window.innerHeight, lastW = window.innerWidth;
@@ -975,8 +972,8 @@
   function dropTomato(x, y) {
     if (reduceMotion()) return;
     const t = makeTomato(mode === "focus" ? randomShape() : randomGrape(), x, y);
-    t.vy = rand(-680, -560);  // pops up first…
-    aimAtBag(t);              // …and arcs into the bag
+    t.vx = rand(-180, 180);   // px/s
+    t.vy = rand(-680, -560);  // pops up first
     simulate(t);
   }
 
@@ -994,8 +991,9 @@
   }
   $("clearTomatoes").addEventListener("click", clearTomatoes);
 
-  // clicking a tomato sends it flying again; anything resting on it drops too
-  function kick(t) {
+  // clicking a tomato sends it flying again — hit its left side and it goes right,
+  // so you can aim it into the bag. Anything resting on it drops too.
+  function kick(t, px = t.cx) {
     if (reduceMotion()) return;
     const i = pile.indexOf(t);
     if (i !== -1) {
@@ -1003,8 +1001,9 @@
       wakeAbove(t);
       savePile();
     }
-    t.vy = rand(-900, -720);
-    aimAtBag(t);
+    const off = Math.max(-1, Math.min(1, (t.cx - px) / t.r));
+    t.vx = off * 520 + rand(-30, 30);
+    t.vy = rand(-1100, -950);   // high enough to clear the bag's rim from the floor
     simulate(t);
   }
   function wakeAbove(t) {
@@ -1029,7 +1028,7 @@
       const dt = Math.max(0, Math.min(0.032, (now - last) / 1000));
       last = now;
       const floor = bag.floor - t.r, right = window.innerWidth - t.r;
-      const prevCx = t.cx;
+      const prevCx = t.cx, prevCy = t.cy;
 
       t.vy += g * dt;
       t.cx += t.vx * dt; t.cy += t.vy * dt;
@@ -1056,14 +1055,22 @@
         t.vx *= Math.pow(0.3, dt);
         contact = true;
       }
-      // the bag's side walls (segments from the rim down to its floor)
-      for (const wx of [bag.wl, bag.wr]) {
-        const side = Math.sign(prevCx - wx) || 1;
-        if (t.cy > bag.top && Math.sign(t.cx - wx) !== side) {   // crossed it this frame
-          t.cx = wx + side * t.r; t.vx = -t.vx * 0.4; contact = true; continue;
+      // the bag's slanted side walls
+      for (const w of bag.walls) {
+        const ex = w.bx - w.ax, ey = w.by - w.ay, len2 = ex * ex + ey * ey;
+        const sideOf = (x, y) => Math.sign(ex * (y - w.ay) - ey * (x - w.ax)) || 1;
+        const k = Math.max(0, Math.min(1, ((t.cx - w.ax) * ex + (t.cy - w.ay) * ey) / len2));
+        const qx = w.ax + ex * k, qy = w.ay + ey * k;
+        const before = sideOf(prevCx, prevCy), now = sideOf(t.cx, t.cy);
+        const len = Math.sqrt(len2), nx0 = -ey / len, ny0 = ex / len;  // unit normal
+        if (before !== now && k > 0 && k < 1) {                          // tunneled through
+          const sgn = sideOf(qx + nx0, qy + ny0) === before ? 1 : -1;
+          t.cx = qx + nx0 * sgn * t.r; t.cy = qy + ny0 * sgn * t.r;
+          const vn = t.vx * nx0 * sgn + t.vy * ny0 * sgn;
+          if (vn < 0) { t.vx -= 1.4 * vn * nx0 * sgn; t.vy -= 1.4 * vn * ny0 * sgn; }
+          contact = true; continue;
         }
-        const py = Math.min(Math.max(t.cy, bag.top), bag.floor);
-        const dx = t.cx - wx, dy = t.cy - py, d = Math.hypot(dx, dy);
+        const dx = t.cx - qx, dy = t.cy - qy, d = Math.hypot(dx, dy);
         if (d >= t.r || d === 0) continue;
         const nx = dx / d, ny = dy / d;
         t.cx += nx * (t.r - d); t.cy += ny * (t.r - d);
