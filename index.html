@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no, email=no, address=no">
+<title>Pomodoro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --fg: #1a1a1a;
+    --muted: #8a8780;
+    --line: #dcd9d2;
+    --panel: #ffffff;
+    --accent: #e8452c;
+    --rest: #3d7a5c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413;
+      --fg: #ecebe7;
+      --muted: #7d7a74;
+      --line: #2c2b29;
+      --panel: #1e1e1c;
+      --accent: #f0583f;
+      --rest: #5fa883;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413;
+    --fg: #ecebe7;
+    --muted: #7d7a74;
+    --line: #2c2b29;
+    --panel: #1e1e1c;
+    --accent: #f0583f;
+    --rest: #5fa883;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    transition: background .4s;
+  }
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  button:focus-visible { outline: 1px dashed var(--muted); outline-offset: 4px; }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 48px 16px 24px;
+  }
+
+  /* mode tabs */
+  .modes { display: flex; gap: 24px; font-size: 13px; }
+  .modes button { color: var(--muted); padding: 4px 0; border-bottom: 1px solid transparent; transition: color .2s; }
+  .modes button:hover { color: var(--fg); }
+  .modes button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+
+  /* dial */
+  .dial {
+    --pad: clamp(16px, 6vw, 32px);
+    position: relative;
+    width: min(80vw, 420px);
+    aspect-ratio: 1;
+    cursor: pointer;
+    background: var(--panel);
+    border-radius: 28px;
+  }
+  .dial svg { position: absolute; inset: var(--pad); width: calc(100% - 2 * var(--pad)); height: calc(100% - 2 * var(--pad)); overflow: visible; }
+  .ticks line { stroke: color-mix(in srgb, var(--muted) 45%, var(--panel)); stroke-width: 1; }
+  .ticks line.major { stroke: var(--muted); }
+  .wedge { fill: var(--c); transition: fill .4s; }
+  .hub { fill: var(--panel); stroke: var(--line); }
+  body { --c: var(--accent); }
+  body[data-mode="short"], body[data-mode="long"] { --c: var(--rest); }
+
+  .time {
+    font-size: clamp(48px, 12vw, 72px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .status { font-size: 13px; color: var(--muted); margin-top: 12px; text-align: center; min-height: 1.4em; }
+  .readout { display: flex; flex-direction: column; align-items: center; }
+
+  /* sessions */
+  .dots { display: flex; gap: 10px; }
+  .dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+    border: 1px solid var(--muted);
+    transition: background .3s, border-color .3s;
+  }
+  .dots span.done { background: var(--accent); border-color: var(--accent); }
+
+  /* controls */
+  .controls { display: flex; align-items: center; gap: 28px; font-size: 13px; }
+  .controls .ghost { color: var(--muted); }
+  .controls .ghost:hover { color: var(--fg); }
+  .controls .primary {
+    border: 1px solid var(--fg);
+    border-radius: 999px;
+    padding: 10px 28px;
+    min-width: 112px;
+    transition: background .2s, color .2s;
+  }
+  .controls .primary:hover { background: var(--fg); color: var(--bg); }
+
+  .hint { font-size: 12px; color: var(--muted); }
+  @media (hover: none) { .hint { display: none; } }
+
+  /* tasks */
+  .tasks { width: min(100%, 520px); font-size: 17px; text-align: center; margin-bottom: -8px; }
+  .tasks ul { list-style: none; display: grid; justify-items: center; gap: 8px; margin-bottom: 10px; }
+  .tasks li { position: relative; display: flex; align-items: baseline; gap: 8px; max-width: 100%; }
+  .tasks .bullet { color: var(--muted); flex: none; }
+  .tasks li .text {
+    padding: 2px 0;
+    color: var(--muted);
+    transition: color .2s, font-size .2s;
+  }
+  /* the current task is the headline above the dial */
+  .tasks li.current { order: -1; margin-bottom: 10px; }
+  .tasks li.current .text { color: var(--accent); font-size: clamp(28px, 8vw, 40px); font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; }
+  .tasks li.current .bullet { color: var(--accent); font-size: clamp(28px, 8vw, 40px); }
+  /* on a break the task waits — dim it */
+  body:not([data-mode="focus"]) .tasks li.current .text,
+  body:not([data-mode="focus"]) .tasks li.current .bullet { color: var(--muted); }
+  /* hover previews the click: open tasks show a faint strike, done ones lift it */
+  .tasks li .text { text-decoration: line-through transparent; text-decoration-thickness: 1px; transition: color .2s, font-size .2s, text-decoration-color .2s; }
+  @media (hover: hover) {
+    .tasks li:not(.done) .text:hover { text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+    .tasks li:not(.current):not(.done) .text:hover { color: var(--fg); }
+    .tasks li.done .text:hover { text-decoration-color: transparent; color: var(--muted); }
+  }
+  .tasks li.done { order: 1; }
+  .tasks li.done .text { text-decoration: line-through; color: var(--line); }
+  .tasks li.done .bullet { color: var(--line); }
+  .tasks li .del {
+    position: absolute; left: 100%; margin-left: 8px;
+    color: var(--muted); opacity: 0; font-size: 13px; padding: 0 2px;
+    transition: opacity .2s;
+  }
+  .tasks li:hover .del, .tasks li .del:focus-visible { opacity: 1; }
+  @media (hover: none) { .tasks li .del { opacity: .6; } }
+  .tasks form { display: flex; justify-content: center; }
+  .tasks input {
+    width: 100%; max-width: 320px;
+    font: inherit; color: var(--fg); text-align: center;
+    background: none; border: none; outline: none;
+    padding: 4px 0;
+    border-bottom: 1px dotted transparent;
+  }
+  .tasks input::placeholder { color: var(--line); }
+  .tasks input:focus { border-bottom-color: var(--line); }
+  .tasks form .bullet { display: none; }
+
+  /* settings */
+  .settings-toggle { font-size: 12px; color: var(--muted); border-bottom: 1px dotted currentColor; padding-bottom: 1px; }
+  .settings-toggle:hover { color: var(--fg); }
+  .settings {
+    width: min(100%, 320px);
+    display: grid;
+    gap: 14px;
+    font-size: 13px;
+    padding: 20px 0 0;
+    border-top: 1px solid var(--line);
+  }
+  .settings[hidden] { display: none; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .row .label { color: var(--muted); }
+  .stepper { display: flex; align-items: center; gap: 4px; }
+  .stepper button {
+    width: 28px; height: 28px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--muted);
+    line-height: 1;
+    transition: color .2s, border-color .2s;
+  }
+  .stepper button:hover { color: var(--fg); border-color: var(--fg); }
+  .stepper button:disabled { opacity: .3; pointer-events: none; }
+  .stepper output { min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
+  .settings .actions { display: flex; justify-content: space-between; padding-top: 4px; font-size: 12px; }
+  .settings .actions button { color: var(--muted); }
+  .settings .actions button:hover { color: var(--fg); }
+
+  footer {
+    padding: 24px 16px 32px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+    text-align: center;
+  }
+  footer .sym { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  footer a { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; padding-bottom: 1px; }
+</style>
+</head>
+<body data-mode="focus">
+<main>
+  <nav class="modes" aria-label="mode">
+    <button data-mode="focus" aria-pressed="true">focus</button>
+    <button data-mode="short" aria-pressed="false">short break</button>
+    <button data-mode="long" aria-pressed="false">long break</button>
+  </nav>
+
+  <section class="tasks" aria-label="tasks">
+    <ul id="taskList"></ul>
+    <form id="taskForm" autocomplete="off">
+      <span class="bullet" aria-hidden="true">*</span>
+      <input id="taskInput" type="text" placeholder="add a task, press enter" aria-label="add a task" maxlength="80">
+    </form>
+  </section>
+
+  <div class="dial" id="dial" title="click to start / pause">
+    <svg viewBox="-110 -110 220 220" aria-hidden="true">
+      <g class="ticks" id="ticks"></g>
+      <path class="wedge" id="wedge" d=""></path>
+      <circle class="hub" r="7"></circle>
+    </svg>
+  </div>
+
+  <div class="readout">
+    <div class="time" id="time">25:00</div>
+    <div class="status" id="status">ready</div>
+  </div>
+
+  <div class="dots" id="dots" aria-label="completed sessions"></div>
+
+  <div class="controls">
+    <button class="ghost" id="reset">reset</button>
+    <button class="primary" id="toggle">start</button>
+    <button class="ghost" id="skip">skip</button>
+  </div>
+
+  <p class="hint">space start/pause · r reset · s skip</p>
+
+  <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings">settings</button>
+
+  <section class="settings" id="settings" hidden aria-label="settings">
+    <div class="row" data-key="focus" data-min="1" data-max="60" data-unit="min">
+      <span class="label">focus</span>
+      <div class="stepper"><button data-d="-1" aria-label="decrease focus">−</button><output></output><button data-d="1" aria-label="increase focus">+</button></div>
+    </div>
+    <div class="row" data-key="short" data-min="1" data-max="30" data-unit="min">
+      <span class="label">short break</span>
+      <div class="stepper"><button data-d="-1" aria-label="decrease short break">−</button><output></output><button data-d="1" aria-label="increase short break">+</button></div>
+    </div>
+    <div class="row" data-key="long" data-min="1" data-max="60" data-unit="min">
+      <span class="label">long break</span>
+      <div class="stepper"><button data-d="-1" aria-label="decrease long break">−</button><output></output><button data-d="1" aria-label="increase long break">+</button></div>
+    </div>
+    <div class="row" data-key="cycle" data-min="2" data-max="8" data-unit="sessions">
+      <span class="label">cycle</span>
+      <div class="stepper"><button data-d="-1" aria-label="decrease sessions per cycle">−</button><output></output><button data-d="1" aria-label="increase sessions per cycle">+</button></div>
+    </div>
+    <div class="actions">
+      <button id="defaults">restore defaults</button>
+      <button id="settingsClose">done</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div><span class="sym">©</span> 2026. Pomodoro. All rights reserved.</div>
+  <div>Inquiries <span class="sym">☞</span> ajangeunajang@gmail.com</div>
+  <div>Design and Developed by <a href="https://www.ajangeunajang.com/" target="_blank" rel="noopener">Euna Jang</a></div>
+</footer>
+
+<script>
+(() => {
+  const DEFAULTS = { focus: 25, short: 5, long: 15, cycle: 4 };
+  const STORE_KEY = "pomodoro-settings";
+  const settings = { ...DEFAULTS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+    for (const k in DEFAULTS) if (Number.isFinite(saved[k])) settings[k] = saved[k];
+  } catch (e) {}
+  const DURATION = {};
+  const syncDurations = () => {
+    DURATION.focus = settings.focus * 60;
+    DURATION.short = settings.short * 60;
+    DURATION.long = settings.long * 60;
+  };
+  syncDurations();
+  const LABEL = { focus: "focus", short: "short break", long: "long break" };
+  const R = 92;
+
+  const $ = (id) => document.getElementById(id);
+  const wedge = $("wedge"), timeEl = $("time"), statusEl = $("status"),
+        toggleBtn = $("toggle"), dotsEl = $("dots");
+
+  let mode = "focus";
+  let remaining = DURATION.focus * 1000; // ms
+  let endAt = null;                       // timestamp while running
+  let completed = 0;                      // focus sessions in current cycle
+
+  // ticks: one per minute of a 60-min face, like a kitchen timer
+  const ticks = $("ticks");
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    const major = i % 5 === 0;
+    const r1 = 100, r2 = major ? 108 : 104;
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", Math.sin(a) * r1); l.setAttribute("y1", -Math.cos(a) * r1);
+    l.setAttribute("x2", Math.sin(a) * r2); l.setAttribute("y2", -Math.cos(a) * r2);
+    if (major) l.classList.add("major");
+    ticks.appendChild(l);
+  }
+
+  // wedge = remaining time, shrinking back toward 12 o'clock (counter-clockwise face)
+  function wedgePath(frac) {
+    if (frac <= 0) return "";
+    if (frac >= 0.99999) return `M0 ${-R} A${R} ${R} 0 1 0 0 ${R} A${R} ${R} 0 1 0 0 ${-R}Z`;
+    const a = frac * Math.PI * 2;
+    const x = -Math.sin(a) * R, y = -Math.cos(a) * R;
+    const large = frac > 0.5 ? 1 : 0;
+    return `M0 0 L0 ${-R} A${R} ${R} 0 ${large} 0 ${x} ${y}Z`;
+  }
+
+  const fmt = (ms) => {
+    const s = Math.ceil(ms / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  };
+
+  function current() {
+    return endAt ? Math.max(0, endAt - Date.now()) : remaining;
+  }
+
+  function renderDots() {
+    dotsEl.innerHTML = "";
+    for (let i = 0; i < settings.cycle; i++) {
+      const s = document.createElement("span");
+      if (i < completed) s.className = "done";
+      dotsEl.appendChild(s);
+    }
+  }
+
+  function render() {
+    const ms = current();
+    // scale the wedge against an hour face so 25 / 5 / 15 min read at a glance
+    wedge.setAttribute("d", wedgePath(ms / (60 * 60 * 1000)));
+    const t = fmt(ms);
+    timeEl.textContent = t;
+    document.title = endAt ? `${t} · ${LABEL[mode]}` : "Pomodoro";
+  }
+
+  function setStatus() {
+    if (endAt) statusEl.textContent = LABEL[mode];
+    else if (remaining < DURATION[mode] * 1000) statusEl.textContent = "paused";
+    else statusEl.textContent = "ready";
+    toggleBtn.textContent = endAt ? "pause" : (remaining < DURATION[mode] * 1000 ? "resume" : "start");
+  }
+
+  function setMode(m, { autostart = false } = {}) {
+    mode = m;
+    endAt = null;
+    remaining = DURATION[m] * 1000;
+    document.body.dataset.mode = m;
+    document.querySelectorAll(".modes button").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+    if (autostart) start();
+    setStatus(); render();
+  }
+
+  function start() {
+    if (endAt) return;
+    endAt = Date.now() + remaining;
+    unlockAudio();
+    setStatus(); loop();
+  }
+  function pause() {
+    if (!endAt) return;
+    remaining = current();
+    endAt = null;
+    setStatus(); render();
+  }
+  const toggle = () => (endAt ? pause() : start());
+
+  function reset() { setMode(mode); }
+
+  function next(finished) {
+    if (mode === "focus") {
+      if (finished) completed++;
+      const nextMode = completed >= settings.cycle ? "long" : "short";
+      renderDots();
+      setMode(nextMode, { autostart: finished });
+    } else {
+      if (mode === "long") completed = 0;
+      renderDots();
+      setMode("focus", { autostart: false });
+    }
+  }
+
+  function finish() {
+    chime();
+    if (Notification?.permission === "granted" && document.hidden) {
+      new Notification(mode === "focus" ? "Focus done — take a break" : "Break over — back to focus");
+    }
+    next(true);
+  }
+
+  let raf = null;
+  function loop() {
+    cancelAnimationFrame(raf);
+    const step = () => {
+      if (!endAt) return;
+      if (current() <= 0) { finish(); return; }
+      render();
+      raf = requestAnimationFrame(step);
+    };
+    step();
+  }
+  // rAF stops in background tabs — keep checking for completion
+  setInterval(() => { if (endAt && current() <= 0) finish(); else if (endAt && document.hidden) render(); }, 500);
+
+  // sound
+  let ctx = null;
+  function unlockAudio() {
+    try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); } catch (e) {}
+    if ("Notification" in window && Notification.permission === "default") {
+      try { Notification.requestPermission(); } catch (e) {}
+    }
+  }
+  function chime() {
+    if (!ctx) return;
+    [0, 0.18, 0.36].forEach((d, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = [880, 660, 880][i];
+      const t = ctx.currentTime + d;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      o.connect(g).connect(ctx.destination);
+      o.start(t); o.stop(t + 0.65);
+    });
+  }
+
+  // events
+  toggleBtn.addEventListener("click", toggle);
+  $("dial").addEventListener("click", toggle);
+  $("reset").addEventListener("click", reset);
+  $("skip").addEventListener("click", () => next(false));
+  document.querySelectorAll(".modes button").forEach((b) =>
+    b.addEventListener("click", () => setMode(b.dataset.mode)));
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest("input, textarea, [contenteditable]")) return;
+    if (e.code === "Space") { e.preventDefault(); toggle(); }
+    else if (e.key === "r") reset();
+    else if (e.key === "s") next(false);
+  });
+
+  // settings panel
+  const panel = $("settings"), panelToggle = $("settingsToggle");
+  const rows = [...panel.querySelectorAll(".row")];
+
+  function renderSettings() {
+    rows.forEach((row) => {
+      const k = row.dataset.key, v = settings[k];
+      row.querySelector("output").textContent = `${v} ${row.dataset.unit}`;
+      const [dec, inc] = row.querySelectorAll("button");
+      dec.disabled = v <= +row.dataset.min;
+      inc.disabled = v >= +row.dataset.max;
+    });
+  }
+
+  function applySettings() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) {}
+    // an untouched session picks up the new length right away;
+    // a running or paused one keeps going and the change applies next time
+    const idle = !endAt && remaining === DURATION[mode] * 1000;
+    syncDurations();
+    if (idle) remaining = DURATION[mode] * 1000;
+    else if (!endAt) remaining = Math.min(remaining, DURATION[mode] * 1000);
+    renderSettings(); renderDots(); setStatus(); render();
+  }
+
+  rows.forEach((row) => {
+    row.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      const k = row.dataset.key;
+      const v = settings[k] + +b.dataset.d;
+      settings[k] = Math.min(+row.dataset.max, Math.max(+row.dataset.min, v));
+      applySettings();
+    }));
+  });
+
+  function openPanel(open) {
+    panel.hidden = !open;
+    panelToggle.setAttribute("aria-expanded", String(open));
+    panelToggle.textContent = open ? "close settings" : "settings";
+  }
+  panelToggle.addEventListener("click", () => openPanel(panel.hidden));
+  $("settingsClose").addEventListener("click", () => openPanel(false));
+  $("defaults").addEventListener("click", () => { Object.assign(settings, DEFAULTS); applySettings(); });
+
+  // tasks — the first unfinished one is what this session is for
+  const TASK_KEY = "pomodoro-tasks";
+  let tasks = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(TASK_KEY) || "[]");
+    if (Array.isArray(saved)) tasks = saved.filter((t) => t && typeof t.text === "string");
+  } catch (e) {}
+  const taskList = $("taskList"), taskInput = $("taskInput");
+
+  function saveTasks() {
+    try { localStorage.setItem(TASK_KEY, JSON.stringify(tasks)); } catch (e) {}
+  }
+
+  function renderTasks() {
+    taskList.innerHTML = "";
+    const cur = tasks.findIndex((t) => !t.done);
+    tasks.forEach((t, i) => {
+      const li = document.createElement("li");
+      if (t.done) li.classList.add("done");
+      if (i === cur) li.classList.add("current");
+      const bullet = document.createElement("span");
+      bullet.className = "bullet"; bullet.textContent = "*"; bullet.setAttribute("aria-hidden", "true");
+      const text = document.createElement("button");
+      text.className = "text"; text.textContent = t.text;
+      text.title = t.done ? "mark as not done" : "mark as done";
+      text.addEventListener("click", () => { t.done = !t.done; saveTasks(); renderTasks(); });
+      const del = document.createElement("button");
+      del.className = "del"; del.textContent = "×"; del.setAttribute("aria-label", `delete ${t.text}`);
+      del.addEventListener("click", () => { tasks.splice(i, 1); saveTasks(); renderTasks(); });
+      li.append(bullet, text, del);
+      taskList.appendChild(li);
+    });
+  }
+
+  $("taskForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = taskInput.value.replace(/^\s*[*\-•]\s*/, "").trim();
+    if (!text) return;
+    tasks.push({ text, done: false });
+    taskInput.value = "";
+    saveTasks(); renderTasks();
+  });
+  taskInput.addEventListener("keydown", (e) => { if (e.key === "Escape") taskInput.blur(); });
+
+  renderTasks();
+  renderSettings(); renderDots(); setStatus(); render();
+})();
+</script>
+</body>
+</html>
