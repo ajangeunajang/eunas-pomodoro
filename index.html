@@ -75,6 +75,9 @@
   /* back to the first screen */
   .back { position: absolute; top: 24px; left: clamp(16px, 4vw, 40px); z-index: 2; font-size: 13px; color: var(--muted); padding: 4px 0; transition: color .2s; }
   .back:hover { color: var(--fg); }
+  .back { display: inline-flex; align-items: center; gap: 8px; }
+  .back svg { width: 16px; height: 10px; transition: translate .2s; }
+  .back:hover svg { translate: -3px 0; }
 
   [hidden] { display: none !important; }
   .stack { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 40px; }
@@ -266,7 +269,7 @@
   </section>
 
   <div class="stack" id="timerView" hidden>
-  <button class="back" id="backToPicker">← all timers</button>
+  <button class="back" id="backToPicker"><svg viewBox="0 0 16 10" aria-hidden="true"><path d="M15 5H1.5M5.5 1 1.5 5l4 4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>all timers</button>
 
   <section class="tasks" aria-label="tasks">
     <ul id="taskList"></ul>
