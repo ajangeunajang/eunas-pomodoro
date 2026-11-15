@@ -241,8 +241,9 @@
     gap: 14px;
     font-size: 13px;
     padding: 20px;
-    background: var(--panel);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, .08);
+    /* page color, not a fill — just enough to keep what's underneath from showing through */
+    background: var(--bg);
+    border: 1px solid var(--line);
   }
   .settings[hidden] { display: none; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
