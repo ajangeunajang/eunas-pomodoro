@@ -243,8 +243,9 @@
   .settings .actions button { color: var(--muted); }
   .settings .actions button:hover { color: var(--fg); }
 
-  .tomato { position: fixed; left: 0; top: 0; width: 44px; height: 44px; pointer-events: none; z-index: 10; will-change: transform; }
+  .tomato { position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent; will-change: transform; }
   .tomato svg { width: 100%; height: 100%; display: block; }
+  .tomato svg > * { pointer-events: auto; cursor: pointer; }
 
   footer {
     padding: 24px 16px 32px;
@@ -720,17 +721,97 @@
     });
   }
 
-  // ---- a cherry tomato pops out of a finished task and piles up on the floor
-  const TOMATO_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="12" cy="13.5" r="9.5" fill="#e8452c"/>
-    <ellipse cx="8.5" cy="10.5" rx="2.4" ry="1.5" fill="#fff" opacity=".35" transform="rotate(-30 8.5 10.5)"/>
-    <path d="M12 4.2 L13.6 7 L16.8 6.4 L14.6 8.6 L15.8 11 L12 9.6 L8.2 11 L9.4 8.6 L7.2 6.4 L10.4 7 Z" fill="#3d7a5c"/>
-    <path d="M12 4.6 Q12.4 2.6 13.8 1.8" stroke="#3d7a5c" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-  </svg>`;
+  // ---- a cherry tomato pops out of a finished task and piles up on the floor.
+  // Every tomato is a little different, and clicking one kicks it back up.
+  const TOMATO_REDS = ["#e8452c", "#e2402a", "#ec4f33", "#db3d26", "#e94a2f"];
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // about 1 in 8 tomatoes comes out a little odd
+  const ODD_KINDS = ["heart", "twin", "long", "flat", "nose", "bumpy"];
+  function randomShape() {
+    return {
+      kind: Math.random() < 0.12 ? ODD_KINDS[Math.floor(Math.random() * ODD_KINDS.length)] : "round",
+      size: Math.round(rand(38, 50)),
+      sx: +rand(0.94, 1.08).toFixed(3),     // a bit wider or narrower
+      sy: +rand(0.88, 1.0).toFixed(3),      // cherry tomatoes are slightly squat
+      color: TOMATO_REDS[Math.floor(Math.random() * TOMATO_REDS.length)],
+      leaves: Math.random() < 0.5 ? 5 : 6,
+      leafRot: Math.round(rand(0, 72)),
+      leafLen: +rand(3.8, 5).toFixed(2),
+      stem: Math.random() < 0.5 ? 1 : -1,   // which way the stem curls
+      phase: +rand(0, 6.28).toFixed(2),     // where the bumps fall on a bumpy one
+    };
+  }
+
+  // body outline + where the leaves sit, in a 24×24 box centered on (12, 12)
+  function tomatoBody(s) {
+    const f = s.color;
+    switch (s.kind) {
+      case "heart":
+        return { svg: `<path d="M12 7.2C9 1.6 1.2 4.2 3.4 12.6 4.8 17.6 9 20.8 12 21.6 15 20.8 19.2 17.6 20.6 12.6 22.8 4.2 15 1.6 12 7.2Z" fill="${f}"/>`, lx: 12, ly: 6.6 };
+      case "twin":
+        return { svg: `<circle cx="8.3" cy="13.6" r="6.8" fill="${f}"/><circle cx="15.4" cy="11.6" r="7.6" fill="${f}"/>`, lx: 15.4, ly: 6.9 };
+      case "flat":
+        return { svg: `<ellipse cx="12" cy="12" rx="11" ry="6.6" fill="${f}"/>`, lx: 12, ly: 8 };
+      case "long":
+        return { svg: `<ellipse cx="12" cy="12.6" rx="7.4" ry="10.4" fill="${f}"/>`, lx: 12, ly: 5.2 };
+      case "nose":
+        return { svg: `<ellipse cx="11.2" cy="12" rx="${(9 * s.sx).toFixed(2)}" ry="${(9 * s.sy).toFixed(2)}" fill="${f}"/><circle cx="19.6" cy="14.2" r="3.1" fill="${f}"/>`, lx: 11.2, ly: 12 - 9 * s.sy + 3.2 };
+      case "bumpy": {
+        const pts = [];
+        for (let i = 0; i < 48; i++) {
+          const a = (i / 48) * Math.PI * 2;
+          const rr = 9.1 + 0.9 * Math.sin(5 * a + (s.phase || 0));
+          pts.push(`${(12 + Math.cos(a) * rr).toFixed(2)},${(12 + Math.sin(a) * rr).toFixed(2)}`);
+        }
+        return { svg: `<polygon points="${pts.join(" ")}" fill="${f}" stroke="${f}" stroke-width=".8" stroke-linejoin="round"/>`, lx: 12, ly: 5.6 };
+      }
+      default: {
+        const ry = 9.5 * s.sy;
+        return { svg: `<ellipse cx="12" cy="12" rx="${(9.5 * s.sx).toFixed(2)}" ry="${ry.toFixed(2)}" fill="${f}"/>`, lx: 12, ly: 12 - ry + 3.2 };
+      }
+    }
+  }
+
+  function tomatoSVG(s) {
+    const body = tomatoBody(s), cx = body.lx, cy = body.ly, pts = [];
+    for (let i = 0; i < s.leaves * 2; i++) {
+      const a = ((s.leafRot + (i * 180) / s.leaves) * Math.PI) / 180;
+      const rr = i % 2 === 0 ? s.leafLen : 1.3;
+      pts.push(`${(cx + Math.sin(a) * rr).toFixed(2)},${(cy - Math.cos(a) * rr * 0.62).toFixed(2)}`);
+    }
+    const sx = s.stem;
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">
+      ${body.svg}
+      <polygon points="${pts.join(" ")}" fill="#3d7a5c" stroke="#3d7a5c" stroke-width=".6" stroke-linejoin="round"/>
+      <path d="M${cx} ${cy - 0.2} Q${cx + sx * 0.3} ${cy - 2.4} ${cx + sx * 1.8} ${cy - 3.2}" stroke="#3d7a5c" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  }
 
   // tomatoes that have come to rest; new ones land on top and roll into the gaps
   const pile = [];
   const MAX_PILE = 80;
+  const place = (t) => {
+    t.el.style.transform = `translate(${t.cx - t.half}px, ${t.cy - t.half}px) rotate(${t.rot}deg)`;
+  };
+
+  function makeTomato(shape, cx, cy, rot = 0) {
+    const el = document.createElement("div");
+    el.className = "tomato";
+    el.style.width = el.style.height = `${shape.size}px`;
+    el.innerHTML = tomatoSVG(shape);
+    document.body.appendChild(el);
+    const t = {
+      el, shape, cx, cy, rot, vx: 0, vy: 0, active: false,
+      half: shape.size / 2,
+      // collision radius ≈ the body (a flat one sits lower, so it gets a smaller circle)
+      r: shape.size * (shape.kind === "flat" ? 0.29 : 0.39) * Math.max(shape.sx, shape.sy),
+    };
+    el.addEventListener("pointerdown", (e) => { e.preventDefault(); kick(t); });
+    place(t);
+    return t;
+  }
+
   let lastH = window.innerHeight;
   window.addEventListener("resize", () => {
     const dh = window.innerHeight - lastH;
@@ -740,65 +821,87 @@
       p.cx = Math.min(p.cx, window.innerWidth - p.r);
       place(p);
     });
+    savePile();
   });
-  const place = (p) => {
-    p.el.style.transform = `translate(${p.cx - p.r}px, ${p.cy - p.r}px) rotate(${p.rot}deg)`;
-  };
 
   // the pile survives reloads: positions are kept relative to the bottom edge
   const PILE_KEY = "pomodoro-tomatoes";
   function savePile() {
     const h = window.innerHeight;
     try {
-      localStorage.setItem(PILE_KEY, JSON.stringify(
-        pile.map((p) => ({ x: Math.round(p.cx), b: Math.round(h - p.cy), rot: Math.round(p.rot) }))));
+      localStorage.setItem(PILE_KEY, JSON.stringify(pile.map((p) => ({
+        x: Math.round(p.cx), b: Math.round(h - p.cy), rot: Math.round(p.rot), shape: p.shape,
+      }))));
     } catch (e) {}
   }
   function restorePile() {
     let saved = [];
     try { saved = JSON.parse(localStorage.getItem(PILE_KEY) || "[]"); } catch (e) {}
     if (!Array.isArray(saved)) return;
-    const r = 22, h = window.innerHeight, w = window.innerWidth;
+    const h = window.innerHeight, w = window.innerWidth;
     saved.slice(-MAX_PILE).forEach((s) => {
       if (!Number.isFinite(s.x) || !Number.isFinite(s.b)) return;
-      const el = document.createElement("div");
-      el.className = "tomato";
-      el.innerHTML = TOMATO_SVG;
-      document.body.appendChild(el);
-      const p = { el, r, cx: Math.min(Math.max(s.x, r), w - r), cy: h - Math.max(s.b, r), rot: s.rot || 0 };
-      place(p);
-      pile.push(p);
+      const shape = s.shape && Number.isFinite(s.shape.size) ? s.shape : randomShape();
+      const t = makeTomato(shape, s.x, h - s.b, s.rot || 0);
+      t.cx = Math.min(Math.max(t.cx, t.r), w - t.r);
+      t.cy = Math.min(t.cy, h - t.r);
+      place(t);
+      pile.push(t);
     });
   }
 
-  function dropTomato(x, y) {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const size = 44, r = size / 2;
-    const el = document.createElement("div");
-    el.className = "tomato";
-    el.innerHTML = TOMATO_SVG;
-    document.body.appendChild(el);
+  const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const t = {
-      el, r, cx: x, cy: y, rot: 0,
-      vx: (Math.random() * 2 - 1) * 180,    // px/s
-      vy: -560 - Math.random() * 120,      // pops up first
-    };
+  function dropTomato(x, y) {
+    if (reduceMotion()) return;
+    const t = makeTomato(randomShape(), x, y);
+    t.vx = rand(-180, 180);   // px/s
+    t.vy = rand(-680, -560);  // pops up first
+    simulate(t);
+  }
+
+  // clicking a tomato sends it flying again; anything resting on it drops too
+  function kick(t) {
+    if (reduceMotion()) return;
+    const i = pile.indexOf(t);
+    if (i !== -1) {
+      pile.splice(i, 1);
+      wakeAbove(t);
+      savePile();
+    }
+    t.vx = rand(-220, 220);
+    t.vy = rand(-900, -720);
+    simulate(t);
+  }
+  function wakeAbove(t) {
+    const above = pile.filter((p) => p.cy < t.cy - t.r * 0.5 && Math.hypot(p.cx - t.cx, p.cy - t.cy) < p.r + t.r + 3);
+    above.forEach((p) => {
+      pile.splice(pile.indexOf(p), 1);
+      p.vx = 0; p.vy = 0;
+      wakeAbove(p);
+      simulate(p);
+    });
+  }
+
+  function simulate(t) {
+    if (t.active) return;
+    t.active = true;
     const g = 2000;
     let last = performance.now(), still = 0;
 
     const step = (now) => {
-      const dt = Math.min(0.032, (now - last) / 1000);
+      // rAF timestamps can precede performance.now() on the first frame
+      const dt = Math.max(0, Math.min(0.032, (now - last) / 1000));
       last = now;
-      const floor = window.innerHeight - r, right = window.innerWidth - r;
+      const floor = window.innerHeight - t.r, right = window.innerWidth - t.r;
 
       t.vy += g * dt;
       t.cx += t.vx * dt; t.cy += t.vy * dt;
       let contact = false;
 
-      if (t.cx < r) { t.cx = r; t.vx = -t.vx * 0.5; }
+      if (t.cx < t.r) { t.cx = t.r; t.vx = -t.vx * 0.5; }
       if (t.cx > right) { t.cx = right; t.vx = -t.vx * 0.5; }
-      if (t.cy >= floor) {
+      if (t.cy >= floor && t.vy >= 0) {
         t.cy = floor; contact = true;
         t.vy = t.vy > 120 ? -t.vy * 0.4 : 0;
         t.vx *= Math.pow(0.05, dt);         // rolling friction on the floor
@@ -818,15 +921,16 @@
         contact = true;
       }
       // collisions can shove it past a wall — keep it on screen
-      t.cx = Math.min(Math.max(t.cx, r), right);
+      t.cx = Math.min(Math.max(t.cx, t.r), right);
       t.cy = Math.min(t.cy, floor);
 
-      t.rot += (t.vx * dt / r) * (180 / Math.PI);
+      t.rot += (t.vx * dt / t.r) * (180 / Math.PI);
       place(t);
 
       // settle once it has barely moved for a moment while touching something
       still = contact && Math.hypot(t.vx, t.vy) < 60 ? still + dt : 0;
       if (still > 0.25) {
+        t.active = false;
         pile.push(t);
         if (pile.length > MAX_PILE) {
           const old = pile.shift();
