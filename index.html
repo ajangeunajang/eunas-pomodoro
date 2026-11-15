@@ -53,6 +53,9 @@
     -webkit-font-smoothing: antialiased;
     transition: background .4s;
   }
+  /* drag-selection takes the current timer color: tomato red on focus, shine muscat on breaks */
+  ::selection { background: color-mix(in srgb, var(--c, var(--accent)) 30%, transparent); color: var(--fg); }
+
   button {
     font: inherit;
     color: inherit;
@@ -264,6 +267,13 @@
   .settings .actions button { color: var(--muted); }
   .settings .actions button:hover { color: var(--fg); }
 
+  .bag {
+    position: fixed; right: clamp(16px, 4vw, 40px); bottom: 6px; z-index: 11;
+    width: clamp(150px, 22vw, 220px); aspect-ratio: 1.6; overflow: visible; pointer-events: none;
+  }
+  .bag-mesh { fill: none; stroke: var(--muted); stroke-width: .8; opacity: .55; vector-effect: non-scaling-stroke; }
+  .bag-edge { fill: none; stroke: var(--muted); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+  .bag-rim { fill: none; stroke: var(--fg); stroke-width: 2; stroke-linecap: round; vector-effect: non-scaling-stroke; }
   .tomato { position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent; will-change: transform; }
   .tomato svg { width: 100%; height: 100%; display: block; }
   .tomato svg > * { pointer-events: auto; cursor: pointer; }
@@ -348,6 +358,19 @@
   <p class="hint">space start/pause · r reset · s skip</p>
   </div>
 </main>
+
+<!-- net bag in the bottom-right corner; finished tasks' fruit lands in it -->
+<svg class="bag" id="bag" viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <pattern id="mesh" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <path d="M0 0V10M0 0H10" class="bag-mesh"/>
+    </pattern>
+    <clipPath id="bagShape"><path d="M2 3 L4 86 Q4 98 16 98 L144 98 Q156 98 156 86 L158 3 Z"/></clipPath>
+  </defs>
+  <rect width="160" height="100" fill="url(#mesh)" clip-path="url(#bagShape)"/>
+  <path d="M2 3 L4 86 Q4 98 16 98 L144 98 Q156 98 156 86 L158 3" class="bag-edge"/>
+  <path d="M1 3 H159" class="bag-rim"/>
+</svg>
 
 <footer>
   <div><span class="sym">©</span> 2026. Pomodoro. All rights reserved.</div>
@@ -889,25 +912,48 @@
     return t;
   }
 
-  let lastH = window.innerHeight;
+  // ---- the net bag: its walls are two vertical segments, its floor sits just above the screen edge
+  const GRAVITY = 2000;
+  const bagEl = $("bag");
+  let bag = null;
+  function measureBag() {
+    const r = bagEl.getBoundingClientRect();
+    const inset = r.width * 0.02;
+    bag = { wl: r.left + inset, wr: r.right - inset, top: r.top + r.height * 0.03, floor: r.bottom - r.height * 0.02 };
+  }
+  measureBag();
+
+  // pick a launch that drops the fruit through the bag's opening
+  function aimAtBag(t) {
+    const lo = bag.wl + t.r + 4, hi = bag.wr - t.r - 4;
+    const tx = lo < hi ? rand(lo, hi) : (bag.wl + bag.wr) / 2;
+    const target = bag.top - t.r;
+    const disc = t.vy * t.vy + 2 * GRAVITY * (target - t.cy);
+    const time = disc > 0 ? (-t.vy + Math.sqrt(disc)) / GRAVITY : 0.7;
+    t.vx = (tx - t.cx) / Math.max(time, 0.25);
+  }
+
+  // the bag is anchored bottom-right, so the pile keeps its distance from that corner
+  let lastH = window.innerHeight, lastW = window.innerWidth;
   window.addEventListener("resize", () => {
-    const dh = window.innerHeight - lastH;
-    lastH = window.innerHeight;
+    const dh = window.innerHeight - lastH, dw = window.innerWidth - lastW;
+    lastH = window.innerHeight; lastW = window.innerWidth;
+    measureBag();
     pile.forEach((p) => {
       p.cy += dh;
-      p.cx = Math.min(p.cx, window.innerWidth - p.r);
+      p.cx = Math.min(Math.max(p.cx + dw, p.r), window.innerWidth - p.r);
       place(p);
     });
     savePile();
   });
 
-  // the pile survives reloads: positions are kept relative to the bottom edge
+  // the pile survives reloads: positions are kept relative to the bottom-right corner
   const PILE_KEY = "pomodoro-tomatoes";
   function savePile() {
-    const h = window.innerHeight;
+    const h = window.innerHeight, w = window.innerWidth;
     try {
       localStorage.setItem(PILE_KEY, JSON.stringify(pile.map((p) => ({
-        x: Math.round(p.cx), b: Math.round(h - p.cy), rot: Math.round(p.rot), shape: p.shape,
+        xr: Math.round(w - p.cx), b: Math.round(h - p.cy), rot: Math.round(p.rot), shape: p.shape,
       }))));
     } catch (e) {}
   }
@@ -917,9 +963,10 @@
     if (!Array.isArray(saved)) return;
     const h = window.innerHeight, w = window.innerWidth;
     saved.slice(-MAX_PILE).forEach((s) => {
-      if (!Number.isFinite(s.x) || !Number.isFinite(s.b)) return;
+      const x = Number.isFinite(s.xr) ? w - s.xr : s.x; // older saves stored x from the left
+      if (!Number.isFinite(x) || !Number.isFinite(s.b)) return;
       const shape = s.shape && Number.isFinite(s.shape.size) ? s.shape : randomShape();
-      const t = makeTomato(shape, s.x, h - s.b, s.rot || 0);
+      const t = makeTomato(shape, x, h - s.b, s.rot || 0);
       t.cx = Math.min(Math.max(t.cx, t.r), w - t.r);
       t.cy = Math.min(t.cy, h - t.r);
       place(t);
@@ -932,8 +979,8 @@
   function dropTomato(x, y) {
     if (reduceMotion()) return;
     const t = makeTomato(mode === "focus" ? randomShape() : randomGrape(), x, y);
-    t.vx = rand(-180, 180);   // px/s
-    t.vy = rand(-680, -560);  // pops up first
+    t.vy = rand(-680, -560);  // pops up first…
+    aimAtBag(t);              // …and arcs into the bag
     simulate(t);
   }
 
@@ -960,8 +1007,8 @@
       wakeAbove(t);
       savePile();
     }
-    t.vx = rand(-220, 220);
     t.vy = rand(-900, -720);
+    aimAtBag(t);
     simulate(t);
   }
   function wakeAbove(t) {
@@ -977,7 +1024,7 @@
   function simulate(t) {
     if (t.active) return;
     t.active = true;
-    const g = 2000;
+    const g = GRAVITY;
     let last = performance.now(), still = 0;
 
     const step = (now) => {
@@ -985,7 +1032,8 @@
       // rAF timestamps can precede performance.now() on the first frame
       const dt = Math.max(0, Math.min(0.032, (now - last) / 1000));
       last = now;
-      const floor = window.innerHeight - t.r, right = window.innerWidth - t.r;
+      const floor = bag.floor - t.r, right = window.innerWidth - t.r;
+      const prevCx = t.cx;
 
       t.vy += g * dt;
       t.cx += t.vx * dt; t.cy += t.vy * dt;
@@ -1012,6 +1060,22 @@
         t.vx *= Math.pow(0.3, dt);
         contact = true;
       }
+      // the bag's side walls (segments from the rim down to its floor)
+      for (const wx of [bag.wl, bag.wr]) {
+        const side = Math.sign(prevCx - wx) || 1;
+        if (t.cy > bag.top && Math.sign(t.cx - wx) !== side) {   // crossed it this frame
+          t.cx = wx + side * t.r; t.vx = -t.vx * 0.4; contact = true; continue;
+        }
+        const py = Math.min(Math.max(t.cy, bag.top), bag.floor);
+        const dx = t.cx - wx, dy = t.cy - py, d = Math.hypot(dx, dy);
+        if (d >= t.r || d === 0) continue;
+        const nx = dx / d, ny = dy / d;
+        t.cx += nx * (t.r - d); t.cy += ny * (t.r - d);
+        const vn = t.vx * nx + t.vy * ny;
+        if (vn < 0) { t.vx -= 1.4 * vn * nx; t.vy -= 1.4 * vn * ny; }
+        contact = true;
+      }
+
       // collisions can shove it past a wall — keep it on screen
       t.cx = Math.min(Math.max(t.cx, t.r), right);
       t.cy = Math.min(t.cy, floor);
