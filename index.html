@@ -243,7 +243,7 @@
   .settings .actions button { color: var(--muted); }
   .settings .actions button:hover { color: var(--fg); }
 
-  .tomato { position: fixed; left: 0; top: 0; width: 26px; height: 26px; pointer-events: none; z-index: 10; will-change: transform; }
+  .tomato { position: fixed; left: 0; top: 0; width: 44px; height: 44px; pointer-events: none; z-index: 10; will-change: transform; }
   .tomato svg { width: 100%; height: 100%; display: block; }
 
   footer {
@@ -730,7 +730,7 @@
 
   function dropTomato(x, y) {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const size = 26;
+    const size = 44;
     const el = document.createElement("div");
     el.className = "tomato";
     el.innerHTML = TOMATO_SVG;
