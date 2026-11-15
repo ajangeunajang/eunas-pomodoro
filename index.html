@@ -174,12 +174,11 @@
   /* on a break the task waits — dim it */
   body:not([data-mode="focus"]) .tasks li.current .text,
   body:not([data-mode="focus"]) .tasks li.current .bullet { color: var(--muted); }
-  /* hover previews the click: open tasks show a faint strike, done ones lift it */
-  .tasks li .text { text-decoration: line-through transparent; text-decoration-thickness: 1px; transition: color .2s, font-size .2s, text-decoration-color .2s; }
+  /* hover: tasks tilt like the clocks */
+  .tasks li .text { display: inline-block; transition: color .2s, font-size .2s, transform .3s cubic-bezier(.34, 1.56, .64, 1); }
   @media (hover: hover) {
-    .tasks li:not(.done) .text:hover { text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+    .tasks li .text:hover { transform: rotate(3deg); }
     .tasks li:not(.current):not(.done) .text:hover { color: var(--fg); }
-    .tasks li.done .text:hover { text-decoration-color: transparent; color: var(--muted); }
   }
   .tasks li.done { order: 1; }
   .tasks li.done .text { text-decoration: line-through; color: var(--line); }
