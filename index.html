@@ -691,7 +691,37 @@
     if (v === "pick") renderPreviews();
     else render();
   }
-  $("backToPicker").addEventListener("click", () => showView("pick"));
+  // the reverse: the timer dial glides back into its card, the other cards fade in
+  $("backToPicker").addEventListener("click", () => {
+    const dial = $("dial"), r = dial.getBoundingClientRect();
+    const from = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: dial.offsetWidth };
+    showView("pick");
+    if (canAnimate()) slideBack(from);
+  });
+
+  function slideBack(from) {
+    const card = pickerEl.querySelector(`.choice[data-mode="${mode}"]`);
+    const face = card.querySelector(".face");
+    const to = face.getBoundingClientRect();
+    const dx = from.cx - (to.left + to.width / 2);
+    const dy = from.cy - (to.top + to.height / 2);
+    const s = from.w / face.offsetWidth;
+    const ease = "cubic-bezier(.22, .9, .25, 1)";
+    card.style.position = "relative";
+    card.style.zIndex = 1;
+    face.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }],
+      { duration: 650, easing: ease }
+    ).finished.then(() => { card.style.zIndex = ""; card.style.position = ""; }, () => {});
+    const others = [pickerEl.querySelector("h1"), ...card.querySelectorAll("span, small"),
+      ...[...pickerEl.querySelectorAll(".choice")].filter((c) => c !== card)];
+    others.forEach((el, i) => {
+      el.animate(
+        [{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }],
+        { duration: 400, delay: 320 + i * 40, easing: ease, fill: "backwards" }
+      );
+    });
+  }
 
   renderTasks();
   renderSettings(); renderDots(); setStatus(); render();
