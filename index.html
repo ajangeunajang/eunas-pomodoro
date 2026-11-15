@@ -114,6 +114,10 @@
   .picker .choice:hover, .picker .choice:focus-visible { color: var(--fg); }
   .picker .choice span { border-bottom: 1px solid transparent; padding-bottom: 2px; transition: color .2s, border-color .2s; }
   .picker .choice:hover span { border-bottom-color: currentColor; }
+  .picker .choice .face { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+  @media (hover: hover) {
+    .picker .choice:hover .face { transform: rotate(3deg); }
+  }
   .bottom-links { display: flex; gap: 20px; }
   body { --c: var(--accent); }
   body[data-mode="short"], body[data-mode="long"] { --c: var(--rest); }
@@ -615,7 +619,10 @@
     const m = btn.dataset.mode;
     const draw = mountDial(btn.querySelector(".face"));
     btn.addEventListener("click", () => {
-      const from = btn.querySelector(".face").getBoundingClientRect();
+      // measure the card untilted: the hover rotation inflates its bounding box
+      const face = btn.querySelector(".face"), r = face.getBoundingClientRect();
+      const w = face.offsetWidth;
+      const from = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w, angle: btn.matches(":hover") ? 3 : 0 };
       if (m !== mode || !endAt) setMode(m);
       showView("timer");
       if (canAnimate()) slideIn(from);
@@ -637,13 +644,14 @@
   function slideIn(from) {
     const dial = $("dial");
     const to = dial.getBoundingClientRect();
-    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
-    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
-    const s = from.width / to.width;
+    const dx = from.cx - (to.left + to.width / 2);
+    const dy = from.cy - (to.top + to.height / 2);
+    const s = from.w / to.width;
     const ease = "cubic-bezier(.22, .9, .25, 1)";
     dial.style.zIndex = 1;
+    // start from the tilted card and straighten out on the way in
     dial.animate(
-      [{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }],
+      [{ transform: `translate(${dx}px, ${dy}px) scale(${s}) rotate(${from.angle}deg)` }, { transform: "none" }],
       { duration: 650, easing: ease }
     ).finished.then(() => { dial.style.zIndex = ""; }, () => {});
     [...timerView.children].forEach((el, i) => {
