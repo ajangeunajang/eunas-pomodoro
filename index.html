@@ -78,21 +78,39 @@
   .modes button:hover { color: var(--fg); }
   .modes button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--fg); }
 
-  /* dial */
-  .dial {
+  [hidden] { display: none !important; }
+  .stack { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 40px; }
+
+  /* clock faces — shared by the picker and the timer */
+  .face {
     --pad: clamp(16px, 6vw, 32px);
     position: relative;
-    width: min(80vw, 420px);
     aspect-ratio: 1;
-    cursor: pointer;
     background: var(--panel);
     border-radius: 28px;
+    overflow: hidden;
   }
-  .dial svg { position: absolute; inset: var(--pad); width: calc(100% - 2 * var(--pad)); height: calc(100% - 2 * var(--pad)); overflow: visible; }
+  .face svg { position: absolute; inset: var(--pad); width: calc(100% - 2 * var(--pad)); height: calc(100% - 2 * var(--pad)); overflow: visible; }
+  .dial { width: min(80vw, 420px); cursor: pointer; }
   .ticks line { stroke: color-mix(in srgb, var(--muted) 45%, var(--panel)); stroke-width: 1; }
   .ticks line.major { stroke: var(--muted); }
   .wedge { fill: var(--c); transition: fill .4s; }
   .hub { fill: var(--panel); stroke: var(--line); }
+  .ring-track { fill: none; stroke: var(--line); stroke-width: 1; }
+  .ring-bar { fill: none; stroke: var(--c); stroke-width: 14; transition: stroke .4s; }
+  .ring-mark { stroke: var(--muted); stroke-width: 1; }
+  .level { position: absolute; left: 0; right: 0; bottom: 0; background: var(--c); transition: background .4s; }
+
+  /* picker */
+  .picker { width: min(100%, 760px); display: flex; flex-direction: column; align-items: center; gap: 32px; }
+  .picker h1 { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .picker .choices { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(12px, 3vw, 28px); }
+  .picker .choice { display: flex; flex-direction: column; align-items: center; gap: 14px; font-size: 13px; color: var(--muted); }
+  .picker .choice .face { width: 100%; --pad: 12%; border-radius: clamp(14px, 3vw, 24px); }
+  .picker .choice:hover, .picker .choice:focus-visible { color: var(--fg); }
+  .picker .choice span { border-bottom: 1px solid transparent; padding-bottom: 2px; transition: color .2s, border-color .2s; }
+  .picker .choice:hover span { border-bottom-color: currentColor; }
+  .bottom-links { display: flex; gap: 20px; }
   body { --c: var(--accent); }
   body[data-mode="short"], body[data-mode="long"] { --c: var(--rest); }
 
@@ -218,8 +236,18 @@
   footer a { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; padding-bottom: 1px; }
 </style>
 </head>
-<body data-mode="focus">
+<body data-mode="focus" data-view="pick">
 <main>
+  <section class="picker" id="picker" aria-label="choose a clock">
+    <h1>choose a clock</h1>
+    <div class="choices">
+      <button class="choice" data-style="dial"><div class="face"></div><span>dial</span></button>
+      <button class="choice" data-style="ring"><div class="face"></div><span>ring</span></button>
+      <button class="choice" data-style="level"><div class="face"></div><span>level</span></button>
+    </div>
+  </section>
+
+  <div class="stack" id="timerView" hidden>
   <nav class="modes" aria-label="mode">
     <button data-mode="focus" aria-pressed="true">focus</button>
     <button data-mode="short" aria-pressed="false">short break</button>
@@ -234,13 +262,7 @@
     </form>
   </section>
 
-  <div class="dial" id="dial" title="click to start / pause">
-    <svg viewBox="-110 -110 220 220" aria-hidden="true">
-      <g class="ticks" id="ticks"></g>
-      <path class="wedge" id="wedge" d=""></path>
-      <circle class="hub" r="7"></circle>
-    </svg>
-  </div>
+  <div class="face dial" id="dial" title="click to start / pause"></div>
 
   <div class="readout">
     <div class="time" id="time">25:00</div>
@@ -257,7 +279,10 @@
 
   <p class="hint">space start/pause · r reset · s skip</p>
 
-  <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings">settings</button>
+  <div class="bottom-links">
+    <button class="settings-toggle" id="backToPicker">change clock</button>
+    <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings">settings</button>
+  </div>
 
   <section class="settings" id="settings" hidden aria-label="settings">
     <div class="row" data-key="focus" data-min="1" data-max="60" data-unit="min">
@@ -281,6 +306,7 @@
       <button id="settingsClose">done</button>
     </div>
   </section>
+  </div>
 </main>
 
 <footer>
@@ -309,7 +335,7 @@
   const R = 92;
 
   const $ = (id) => document.getElementById(id);
-  const wedge = $("wedge"), timeEl = $("time"), statusEl = $("status"),
+  const timeEl = $("time"), statusEl = $("status"),
         toggleBtn = $("toggle"), dotsEl = $("dots");
 
   let mode = "focus";
@@ -317,18 +343,59 @@
   let endAt = null;                       // timestamp while running
   let completed = 0;                      // focus sessions in current cycle
 
-  // ticks: one per minute of a 60-min face, like a kitchen timer
-  const ticks = $("ticks");
-  for (let i = 0; i < 60; i++) {
-    const a = (i / 60) * Math.PI * 2;
-    const major = i % 5 === 0;
-    const r1 = 100, r2 = major ? 108 : 104;
-    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    l.setAttribute("x1", Math.sin(a) * r1); l.setAttribute("y1", -Math.cos(a) * r1);
-    l.setAttribute("x2", Math.sin(a) * r2); l.setAttribute("y2", -Math.cos(a) * r2);
-    if (major) l.classList.add("major");
-    ticks.appendChild(l);
-  }
+  // ---- clock faces: each mounts into a .face and returns draw(msLeft, msTotal)
+  const NS = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs = {}) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+
+  const CLOCKS = {
+    // kitchen-timer wedge on a 60-min face, so 25 / 5 / 15 min read at a glance
+    dial(face) {
+      const svg = svgEl("svg", { viewBox: "-110 -110 220 220", "aria-hidden": "true" });
+      const ticks = svgEl("g", { class: "ticks" });
+      for (let i = 0; i < 60; i++) {
+        const a = (i / 60) * Math.PI * 2, major = i % 5 === 0;
+        const r1 = 100, r2 = major ? 108 : 104;
+        ticks.appendChild(svgEl("line", {
+          x1: Math.sin(a) * r1, y1: -Math.cos(a) * r1,
+          x2: Math.sin(a) * r2, y2: -Math.cos(a) * r2,
+          class: major ? "major" : "",
+        }));
+      }
+      const wedge = svgEl("path", { class: "wedge" });
+      svg.append(ticks, wedge, svgEl("circle", { class: "hub", r: 7 }));
+      face.appendChild(svg);
+      return (ms) => wedge.setAttribute("d", wedgePath(clamp01(ms / 3600000)));
+    },
+    // a band that unwinds back to 12 o'clock over the session
+    ring(face) {
+      const r = 92, C = 2 * Math.PI * r;
+      const svg = svgEl("svg", { viewBox: "-110 -110 220 220", "aria-hidden": "true" });
+      const bar = svgEl("circle", { class: "ring-bar", r, transform: "scale(-1 1) rotate(-90)" });
+      svg.append(
+        svgEl("circle", { class: "ring-track", r }),
+        bar,
+        svgEl("line", { class: "ring-mark", x1: 0, y1: -r - 14, x2: 0, y2: -r - 8 }),
+      );
+      face.appendChild(svg);
+      return (ms, total) => bar.setAttribute("stroke-dasharray", `${C * clamp01(ms / total)} ${C}`);
+    },
+    // the box drains like a glass
+    level(face) {
+      const fill = document.createElement("div");
+      fill.className = "level";
+      face.appendChild(fill);
+      return (ms, total) => { fill.style.height = `${clamp01(ms / total) * 100}%`; };
+    },
+  };
+  const mountClock = (face, style) => { face.innerHTML = ""; return CLOCKS[style](face); };
+
+  let clockStyle = "dial";
+  let drawMain = mountClock($("dial"), clockStyle);
 
   // wedge = remaining time, shrinking back toward 12 o'clock (counter-clockwise face)
   function wedgePath(frac) {
@@ -360,8 +427,7 @@
 
   function render() {
     const ms = current();
-    // scale the wedge against an hour face so 25 / 5 / 15 min read at a glance
-    wedge.setAttribute("d", wedgePath(ms / (60 * 60 * 1000)));
+    drawMain(ms, DURATION[mode] * 1000);
     const t = fmt(ms);
     timeEl.textContent = t;
     document.title = endAt ? `${t} · ${LABEL[mode]}` : "Pomodoro";
@@ -469,6 +535,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.target.closest("input, textarea, [contenteditable]")) return;
+    if (document.body.dataset.view !== "timer") return;
     if (e.code === "Space") { e.preventDefault(); toggle(); }
     else if (e.key === "r") reset();
     else if (e.key === "s") next(false);
@@ -561,8 +628,43 @@
   });
   taskInput.addEventListener("keydown", (e) => { if (e.key === "Escape") taskInput.blur(); });
 
+  // ---- picker: the first screen shows the three clocks running a demo loop
+  const pickerEl = $("picker"), timerView = $("timerView");
+  const previews = [...pickerEl.querySelectorAll(".choice")].map((btn) => {
+    const draw = mountClock(btn.querySelector(".face"), btn.dataset.style);
+    btn.addEventListener("click", () => {
+      clockStyle = btn.dataset.style;
+      drawMain = mountClock($("dial"), clockStyle);
+      showView("timer");
+    });
+    return draw;
+  });
+
+  let previewRaf = null;
+  function animatePreviews() {
+    const demo = 25 * 60000, period = 7000;
+    const tick = (t) => {
+      if (document.body.dataset.view !== "pick") return;
+      const f = 1 - (t % period) / period;
+      previews.forEach((draw) => draw(f * demo, demo));
+      previewRaf = requestAnimationFrame(tick);
+    };
+    cancelAnimationFrame(previewRaf);
+    previewRaf = requestAnimationFrame(tick);
+  }
+
+  function showView(v) {
+    document.body.dataset.view = v;
+    pickerEl.hidden = v !== "pick";
+    timerView.hidden = v !== "timer";
+    if (v === "pick") animatePreviews();
+    else render();
+  }
+  $("backToPicker").addEventListener("click", () => showView("pick"));
+
   renderTasks();
   renderSettings(); renderDots(); setStatus(); render();
+  showView("pick");
 })();
 </script>
 </body>
