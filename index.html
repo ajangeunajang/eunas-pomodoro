@@ -114,9 +114,9 @@
   .picker .choice:hover, .picker .choice:focus-visible { color: var(--fg); }
   .picker .choice span { border-bottom: 1px solid transparent; padding-bottom: 2px; transition: color .2s, border-color .2s; }
   .picker .choice:hover span { border-bottom-color: currentColor; }
-  .picker .choice .face { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+  .picker .choice .face, .dial { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
   @media (hover: hover) {
-    .picker .choice:hover .face { transform: rotate(3deg); }
+    .picker .choice:hover .face, .dial:hover { transform: rotate(3deg); }
   }
   .bottom-links { display: flex; gap: 20px; }
   body { --c: var(--accent); }
