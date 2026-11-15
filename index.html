@@ -99,7 +99,7 @@
 
   /* picker */
   .picker { width: min(100%, 1120px); display: flex; flex-direction: column; align-items: center; gap: 32px; }
-  .picker h1 { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .picker h1 { display: flex; align-items: baseline; gap: 8px; color: var(--accent); font-size: clamp(28px, 8vw, 40px); font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; }
   .picker .choices { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(16px, 3vw, 40px); }
   @media (max-width: 640px) {
     .picker .choices { grid-template-columns: 1fr; justify-items: center; gap: 36px; }
@@ -247,7 +247,7 @@
 <body data-mode="focus" data-view="pick">
 <main>
   <section class="picker" id="picker" aria-label="choose a clock">
-    <h1>choose a timer</h1>
+    <h1><span aria-hidden="true">*</span>choose a timer</h1>
     <div class="choices">
       <button class="choice" data-mode="focus"><div class="face"></div><span>focus</span><small></small></button>
       <button class="choice" data-mode="short"><div class="face"></div><span>short break</span><small></small></button>
