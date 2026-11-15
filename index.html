@@ -16,7 +16,7 @@
     --line: #dcd9d2;
     --panel: #ffffff;
     --accent: #e8452c;
-    --rest: #3d7a5c;
+    --rest: #a3c443; /* shine muscat */
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -26,7 +26,7 @@
       --line: #2c2b29;
       --panel: #1e1e1c;
       --accent: #f0583f;
-      --rest: #5fa883;
+      --rest: #b6d35c;
     }
   }
   :root[data-theme="dark"] {
@@ -36,7 +36,7 @@
     --line: #2c2b29;
     --panel: #1e1e1c;
     --accent: #f0583f;
-    --rest: #5fa883;
+    --rest: #b6d35c;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -812,7 +812,29 @@
     }
   }
 
+  // breaks pop a shine muscat grape instead: a plump pale-green oval with a short stem
+  const GRAPE_GREENS = ["#b5d35a", "#a9cc4f", "#c1d96b", "#b0cf55", "#bcd662"];
+  function randomGrape() {
+    return {
+      fruit: "grape",
+      size: Math.round(rand(36, 46)),
+      sx: +rand(0.9, 1.04).toFixed(3),
+      sy: +rand(0.96, 1.08).toFixed(3),    // grapes run a little tall
+      color: GRAPE_GREENS[Math.floor(Math.random() * GRAPE_GREENS.length)],
+      stem: Math.random() < 0.5 ? 1 : -1,
+    };
+  }
+  function grapeSVG(s) {
+    const rx = 8 * s.sx, ry = 9.8 * s.sy, top = 12 - ry, k = s.stem;
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">
+      <ellipse cx="12" cy="12" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${s.color}"/>
+      <circle cx="12" cy="${(12 + ry - 1.3).toFixed(2)}" r=".7" fill="#7f9a32"/>
+      <path d="M12 ${(top + 0.8).toFixed(2)} Q${12 + k * 0.4} ${(top - 1).toFixed(2)} ${12 + k * 1.4} ${(top - 1.8).toFixed(2)}" stroke="#7d6b35" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  }
+
   function tomatoSVG(s) {
+    if (s.fruit === "grape") return grapeSVG(s);
     const body = tomatoBody(s), cx = body.lx, cy = body.ly, pts = [];
     for (let i = 0; i < s.leaves * 2; i++) {
       const a = ((s.leafRot + (i * 180) / s.leaves) * Math.PI) / 180;
@@ -893,7 +915,7 @@
 
   function dropTomato(x, y) {
     if (reduceMotion()) return;
-    const t = makeTomato(randomShape(), x, y);
+    const t = makeTomato(mode === "focus" ? randomShape() : randomGrape(), x, y);
     t.vx = rand(-180, 180);   // px/s
     t.vy = rand(-680, -560);  // pops up first
     simulate(t);
