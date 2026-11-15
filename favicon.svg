@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <ellipse cx="12" cy="13.4" rx="10.4" ry="9.6" fill="#e8452c"/>
-  <polygon points="13.42,3.69 13.13,5.89 16.60,6.40 13.13,6.91 13.42,9.11 11.57,7.23 8.28,8.08 10.60,6.40 8.28,4.72 11.57,5.57" fill="#3d7a5c" stroke="#3d7a5c" stroke-width=".7" stroke-linejoin="round"/>
-  <path d="M12 6.2 Q12.4 3.6 14 2.6" stroke="#3d7a5c" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="2.2 2 19.6 19.6">
+  <ellipse cx="12" cy="12" rx="9.50" ry="8.74" fill="#e8452c"/>
+  <polygon points="12.76,3.77 12.84,5.84 16.13,5.53 13.28,6.60 15.37,8.21 12.44,7.22 11.24,9.15 11.16,7.08 7.87,7.39 10.72,6.32 8.63,4.71 11.56,5.70" fill="#3d7a5c" stroke="#3d7a5c" stroke-width=".6" stroke-linejoin="round"/>
+  <path d="M12 6.26 Q12.3 4.06 13.8 3.26" stroke="#3d7a5c" stroke-width="1.3" fill="none" stroke-linecap="round"/>
 </svg>
