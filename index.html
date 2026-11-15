@@ -72,11 +72,9 @@
     padding: 48px 16px 24px;
   }
 
-  /* mode tabs */
-  .modes { display: flex; gap: 24px; font-size: 13px; }
-  .modes button { color: var(--muted); padding: 4px 0; border-bottom: 1px solid transparent; transition: color .2s; }
-  .modes button:hover { color: var(--fg); }
-  .modes button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+  /* back to the first screen */
+  .back { font-size: 13px; color: var(--muted); padding: 4px 0; transition: color .2s; }
+  .back:hover { color: var(--fg); }
 
   [hidden] { display: none !important; }
   .stack { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 40px; }
@@ -129,7 +127,6 @@
   @media (hover: hover) {
     .picker .choice:hover .face, .dial:not(.settled):hover { transform: rotate(3deg); }
   }
-  .bottom-links { display: flex; gap: 20px; }
   body { --c: var(--accent); }
   body[data-mode="short"], body[data-mode="long"] { --c: var(--rest); }
 
@@ -266,11 +263,7 @@
   </section>
 
   <div class="stack" id="timerView" hidden>
-  <nav class="modes" aria-label="mode">
-    <button data-mode="focus" aria-pressed="true">focus</button>
-    <button data-mode="short" aria-pressed="false">short break</button>
-    <button data-mode="long" aria-pressed="false">long break</button>
-  </nav>
+  <button class="back" id="backToPicker">← all timers</button>
 
   <section class="tasks" aria-label="tasks">
     <ul id="taskList"></ul>
@@ -297,10 +290,7 @@
 
   <p class="hint">space start/pause · r reset · s skip</p>
 
-  <div class="bottom-links">
-    <button class="settings-toggle" id="backToPicker">all timers</button>
-    <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings">settings</button>
-  </div>
+  <button class="settings-toggle" id="settingsToggle" aria-expanded="false" aria-controls="settings">settings</button>
 
   <section class="settings" id="settings" hidden aria-label="settings">
     <div class="row" data-key="focus" data-min="1" data-max="60" data-unit="min">
@@ -440,8 +430,6 @@
     endAt = null;
     remaining = DURATION[m] * 1000;
     document.body.dataset.mode = m;
-    document.querySelectorAll(".modes button").forEach((b) =>
-      b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
     if (autostart) start();
     setStatus(); render();
   }
@@ -536,8 +524,6 @@
   $("dial").addEventListener("mouseleave", (e) => e.currentTarget.classList.remove("settled"));
   $("reset").addEventListener("click", reset);
   $("skip").addEventListener("click", () => next(false));
-  document.querySelectorAll(".modes button").forEach((b) =>
-    b.addEventListener("click", () => setMode(b.dataset.mode)));
   document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.target.closest("input, textarea, [contenteditable]")) return;
