@@ -127,7 +127,7 @@
   .picker .choice:hover span { border-bottom-color: currentColor; }
   .picker .choice .face, .dial { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
   @media (hover: hover) {
-    .picker .choice:hover .face, .dial:hover { transform: rotate(3deg); }
+    .picker .choice:hover .face, .dial:not(.settled):hover { transform: rotate(3deg); }
   }
   .bottom-links { display: flex; gap: 20px; }
   body { --c: var(--accent); }
@@ -531,7 +531,9 @@
 
   // events
   toggleBtn.addEventListener("click", toggle);
-  $("dial").addEventListener("click", toggle);
+  // clicking the dial straightens it: no hover tilt after the buzz until the pointer leaves
+  $("dial").addEventListener("click", (e) => { e.currentTarget.classList.add("settled"); toggle(); });
+  $("dial").addEventListener("mouseleave", (e) => e.currentTarget.classList.remove("settled"));
   $("reset").addEventListener("click", reset);
   $("skip").addEventListener("click", () => next(false));
   document.querySelectorAll(".modes button").forEach((b) =>
