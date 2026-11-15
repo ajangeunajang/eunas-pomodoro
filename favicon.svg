@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="2.45 2.45 19.1 19.1">
-  <g transform="rotate(12 12 12)">
-  <ellipse cx="12" cy="12" rx="9.50" ry="8.74" fill="#e8452c"/>
-  <polygon points="12.76,3.77 12.84,5.84 16.13,5.53 13.28,6.60 15.37,8.21 12.44,7.22 11.24,9.15 11.16,7.08 7.87,7.39 10.72,6.32 8.63,4.71 11.56,5.70" fill="#3d7a5c" stroke="#3d7a5c" stroke-width=".6" stroke-linejoin="round"/>
-  <path d="M12 6.26 Q12.3 4.06 13.8 3.26" stroke="#3d7a5c" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="2.51 2.51 18.98 18.98">
+  <g transform="rotate(25 12 12)">
+    <ellipse cx="12" cy="12" rx="9.50" ry="8.74" fill="#e8452c"/>
+    <polygon points="12.76,3.77 12.84,5.84 16.13,5.53 13.28,6.60 15.37,8.21 12.44,7.22 11.24,9.15 11.16,7.08 7.87,7.39 10.72,6.32 8.63,4.71 11.56,5.70" fill="#3d7a5c" stroke="#3d7a5c" stroke-width=".6" stroke-linejoin="round"/>
+    <path d="M12 6.26 Q12.3 4.06 13.8 3.26" stroke="#3d7a5c" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  </g>
 </svg>
