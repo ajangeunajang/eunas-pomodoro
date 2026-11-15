@@ -69,11 +69,11 @@
     align-items: center;
     justify-content: center;
     gap: 40px;
-    padding: 48px 16px 24px;
+    padding: 72px 16px 24px;
   }
 
   /* back to the first screen */
-  .back { font-size: 13px; color: var(--muted); padding: 4px 0; transition: color .2s; }
+  .back { position: absolute; top: 24px; left: clamp(16px, 4vw, 40px); z-index: 2; font-size: 13px; color: var(--muted); padding: 4px 0; transition: color .2s; }
   .back:hover { color: var(--fg); }
 
   [hidden] { display: none !important; }
@@ -263,6 +263,7 @@
   </section>
 
   <div class="stack" id="timerView" hidden>
+  <button class="back" id="backToPicker">← all timers</button>
 
   <section class="tasks" aria-label="tasks">
     <ul id="taskList"></ul>
@@ -271,8 +272,6 @@
       <input id="taskInput" type="text" placeholder="add a task, press enter" aria-label="add a task" maxlength="80">
     </form>
   </section>
-
-  <button class="back" id="backToPicker">← all timers</button>
 
   <div class="face dial" id="dial" title="click to start / pause"></div>
 
